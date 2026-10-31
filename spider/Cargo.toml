@@ -82,7 +82,7 @@ httpdate = { version = "1", optional = true }
 rand = { version = "0.9", optional = true }
 serde_regex = { version = "1", optional = true }
 llm_json = { version = "1", optional = true }
-thirtyfour = { version = "0.36", optional = true }
+thirtyfour = { version = "0.38", optional = true }
 statrs = { version = "0.18", optional = true }
 aho-corasick = { version = "1" }
 memchr = "2"
@@ -121,15 +121,15 @@ tikv-jemallocator = { version = "0.6", optional = true }
 mimalloc = { version = "0.1", optional = true, default-features = false }
 
 [dependencies.chromey]
-# 2.54 is the first release carrying the engine-native Markdown content
+# 2.54 was the first release carrying the engine-native Markdown content
 # methods (`Page::content_markdown` & co.) that `prefer_native_markdown` uses.
-version = "2.54"
+version = "2.58"
 optional = true
 default-features = false
 features = ["bytes", "stream"]
 
 [dependencies.spider_remote_cache]
-version = "0.4"
+version = "0.5"
 optional = true
 default-features = false
 
@@ -193,6 +193,7 @@ reqwest = { version = "0.13", features = [
 ] }
 
 [dev-dependencies]
+tempfile = "3"
 serde_json = "1"
 env_logger = "0.11"
 criterion = { version = "0.8", features = ["async_tokio", "html_reports"] }
