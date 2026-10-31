@@ -444,8 +444,21 @@ pub fn create_handler_config(config: &Configuration) -> HandlerConfig {
         },
         // JS / meta-refresh loop guard. `None` preserves prior behavior.
         max_main_frame_navigations: config.max_main_frame_navigations,
+        connect_headers: connect_headers(config),
         ..HandlerConfig::default()
     }
+}
+
+/// The remote browser's WebSocket upgrade headers. An invalid header is
+/// skipped and named, never its value: these usually carry a token.
+fn connect_headers(config: &Configuration) -> chromiumoxide::conn::ConnectHeaders {
+    let mut out = chromiumoxide::conn::ConnectHeaders::new();
+    for (name, value) in config.chrome_connection_headers.iter().flatten() {
+        if out.insert(name.as_str(), value.as_str()).is_err() {
+            log::warn!("skipping invalid chrome connection header {name}");
+        }
+    }
+    out
 }
 
 lazy_static! {
@@ -2171,6 +2184,30 @@ mod tests {
         assert!(
             hc.max_redirects.is_none(),
             "without explicit opt-in, Chrome path must not cap redirects"
+        );
+    }
+
+    #[test]
+    fn test_connection_headers_ride_only_on_the_websocket_upgrade() {
+        let mut cfg = Configuration::default();
+        cfg.with_chrome_connection_headers(Some(vec![
+            ("authorization".into(), "Bearer t0k3n".into()),
+            ("not a header".into(), "x".into()),
+        ]));
+        let hc = create_handler_config(&cfg);
+        let expected = chromiumoxide::conn::ConnectHeaders::new()
+            .with("authorization", "Bearer t0k3n")
+            .unwrap();
+        assert_eq!(hc.connect_headers, expected, "invalid header skipped");
+        assert!(
+            hc.extra_headers.as_ref().map_or(true, |h| !h
+                .keys()
+                .any(|k| k.eq_ignore_ascii_case("authorization"))),
+            "the token must never reach page requests"
+        );
+        assert_eq!(
+            create_handler_config(&Configuration::default()).connect_headers,
+            chromiumoxide::conn::ConnectHeaders::new()
         );
     }
 

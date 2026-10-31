@@ -14334,6 +14334,18 @@ impl Website {
         self
     }
 
+    /// Set headers for the WebSocket upgrade to a remote browser, such as
+    /// `("authorization", "Bearer <token>")`. They are never sent with page
+    /// requests. Discovery does not carry them, so use a `ws://` connection
+    /// url. This method does nothing if the `chrome` is not enabled.
+    pub fn with_chrome_connection_headers(
+        &mut self,
+        headers: Option<Vec<(String, String)>>,
+    ) -> &mut Self {
+        self.configuration.with_chrome_connection_headers(headers);
+        self
+    }
+
     /// Set multiple remote Chrome connection URLs for failover. This method does nothing if the `chrome` is not enabled.
     pub fn with_chrome_connections(&mut self, urls: Vec<String>) -> &mut Self {
         self.configuration.with_chrome_connections(urls);
