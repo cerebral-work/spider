@@ -586,6 +586,13 @@ pub struct Configuration {
     pub chrome_connection_urls: Option<Vec<String>>,
     #[cfg(feature = "chrome")]
     #[cfg_attr(feature = "serde", serde(skip))]
+    /// Headers sent only on the WebSocket upgrade to a remote browser, such as
+    /// `Authorization: Bearer <token>` for an endpoint that requires one. They
+    /// never reach page requests. The `/json/version` discovery request does
+    /// not carry them, so pair them with a `ws://` connection URL.
+    pub chrome_connection_headers: Option<Vec<(String, String)>>,
+    #[cfg(feature = "chrome")]
+    #[cfg_attr(feature = "serde", serde(skip))]
     /// Lazy, lock-free chrome failover instance reused across every
     /// `setup_browser_configuration` call. Built on first use, reset by
     /// `with_chrome_connections`. Internal cache; not part of public API.
@@ -2229,6 +2236,28 @@ impl Configuration {
     #[cfg(not(feature = "chrome"))]
     /// Set the connection url for the chrome instance. This method does nothing if the `chrome` is not enabled.
     pub fn with_chrome_connection(&mut self, _chrome_connection_url: Option<String>) -> &mut Self {
+        self
+    }
+
+    #[cfg(feature = "chrome")]
+    /// Set headers for the WebSocket upgrade to a remote browser, such as
+    /// `("authorization", "Bearer <token>")`. They are never sent with page
+    /// requests. Discovery does not carry them, so use a `ws://` connection
+    /// url. This method does nothing if the `chrome` is not enabled.
+    pub fn with_chrome_connection_headers(
+        &mut self,
+        headers: Option<Vec<(String, String)>>,
+    ) -> &mut Self {
+        self.chrome_connection_headers = headers;
+        self
+    }
+
+    #[cfg(not(feature = "chrome"))]
+    /// Set headers for the WebSocket upgrade to a remote browser. This method does nothing if the `chrome` is not enabled.
+    pub fn with_chrome_connection_headers(
+        &mut self,
+        _headers: Option<Vec<(String, String)>>,
+    ) -> &mut Self {
         self
     }
 
