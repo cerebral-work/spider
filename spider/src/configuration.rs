@@ -67,6 +67,23 @@ pub type AllowList = Vec<CompactString>;
 /// Allow list regex.
 pub type AllowList = Box<regex::RegexSet>;
 
+#[cfg(feature = "chrome")]
+/// WebSocket upgrade headers for a remote browser. `Debug` prints the names
+/// only, because the values usually carry a bearer token. chromey's own
+/// `HandlerConfig` Debug and tungstenite's handshake trace log still show
+/// them, so keep trace logging off where the token matters.
+#[derive(Clone, Default, PartialEq)]
+pub struct ChromeConnectionHeaders(pub Vec<(String, String)>);
+
+#[cfg(feature = "chrome")]
+impl std::fmt::Debug for ChromeConnectionHeaders {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list()
+            .entries(self.0.iter().map(|(name, _)| format!("{name}: <redacted>")))
+            .finish()
+    }
+}
+
 /// Whitelist or Blacklist
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(not(feature = "regex"), derive(PartialEq, Eq))]
@@ -590,7 +607,7 @@ pub struct Configuration {
     /// `Authorization: Bearer <token>` for an endpoint that requires one. They
     /// never reach page requests. The `/json/version` discovery request does
     /// not carry them, so pair them with a `ws://` connection URL.
-    pub chrome_connection_headers: Option<Vec<(String, String)>>,
+    pub chrome_connection_headers: Option<ChromeConnectionHeaders>,
     #[cfg(feature = "chrome")]
     #[cfg_attr(feature = "serde", serde(skip))]
     /// Lazy, lock-free chrome failover instance reused across every
@@ -2248,7 +2265,7 @@ impl Configuration {
         &mut self,
         headers: Option<Vec<(String, String)>>,
     ) -> &mut Self {
-        self.chrome_connection_headers = headers;
+        self.chrome_connection_headers = headers.map(ChromeConnectionHeaders);
         self
     }
 

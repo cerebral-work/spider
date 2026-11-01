@@ -453,7 +453,11 @@ pub fn create_handler_config(config: &Configuration) -> HandlerConfig {
 /// skipped and named, never its value: these usually carry a token.
 fn connect_headers(config: &Configuration) -> chromiumoxide::conn::ConnectHeaders {
     let mut out = chromiumoxide::conn::ConnectHeaders::new();
-    for (name, value) in config.chrome_connection_headers.iter().flatten() {
+    for (name, value) in config
+        .chrome_connection_headers
+        .iter()
+        .flat_map(|h| h.0.iter())
+    {
         if out.insert(name.as_str(), value.as_str()).is_err() {
             log::warn!("skipping invalid chrome connection header {name}");
         }
@@ -2205,6 +2209,9 @@ mod tests {
                 .any(|k| k.eq_ignore_ascii_case("authorization"))),
             "the token must never reach page requests"
         );
+        let debug = format!("{cfg:?}");
+        assert!(!debug.contains("t0k3n"), "Debug must not print the token");
+        assert!(debug.contains("authorization: <redacted>"));
         assert_eq!(
             create_handler_config(&Configuration::default()).connect_headers,
             chromiumoxide::conn::ConnectHeaders::new()
