@@ -20,6 +20,7 @@ Set `OBSCURA_PROFILE=/path/device.json` to run it with a device profile.
 | `refresh` | A page that refreshes to another page or to a 404 reports that document's URL and status |
 | `dns` | A hostname only the browser can resolve still loads (no local-DNS veto) |
 | `session` | Two crawls sharing a cookie jar: Anubis challenges only the first |
+| `httponly` | A cookie the browser set `HttpOnly` on one page stays hidden from scripts on the next |
 | `challenge-page` | A captured Anubis challenge page classifies as `Challenge`, and its honeypot link is not extracted |
 | pointer | No `Input.dispatchMouseEvent` reaches the browser with `PointerAssist` off |
 | identity | Every request at the backend carries one user agent and platform |

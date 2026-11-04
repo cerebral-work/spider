@@ -27,8 +27,13 @@ async fn fetch(url: &str, wait_secs: u64) -> Option<Page> {
 
 /// `fetch` with the crawl's cookie jar: crawls given one jar share a session.
 async fn fetch_with_jar(url: &str, wait_secs: u64, jar: Arc<Jar>) -> Option<Page> {
+    crawl(url, wait_secs, 1, jar).await.into_iter().next()
+}
+
+/// Up to `limit` pages from `url`, configured as in `fetch`.
+async fn crawl(url: &str, wait_secs: u64, limit: u32, jar: Arc<Jar>) -> Vec<Page> {
     let mut w = Website::new(url);
-    w.with_limit(1)
+    w.with_limit(limit)
         .with_depth(0)
         .with_user_agent(None)
         .with_stealth(false)
@@ -38,13 +43,21 @@ async fn fetch_with_jar(url: &str, wait_secs: u64, jar: Arc<Jar>) -> Option<Page
             wait_secs,
         )))))
         .with_chrome_connection(Some(env("CDP")));
-    let mut w = w.build().ok()?;
+    let Ok(mut w) = w.build() else {
+        return Vec::new();
+    };
     w.cookie_jar = jar;
-    let mut rx = w.subscribe(4);
-    let got = tokio::spawn(async move { rx.recv().await.ok() });
+    let mut rx = w.subscribe(16);
+    let got = tokio::spawn(async move {
+        let mut pages = Vec::new();
+        while let Ok(page) = rx.recv().await {
+            pages.push(page);
+        }
+        pages
+    });
     w.crawl().await;
     w.unsubscribe();
-    got.await.ok().flatten()
+    got.await.unwrap_or_default()
 }
 
 fn title(page: &Page) -> String {
@@ -148,6 +161,22 @@ async fn session(c: &mut Checks) {
     }
 }
 
+/// The browser's own cookies keep their attributes from page to page: an
+/// HttpOnly cookie set on one page stays hidden from scripts on the next.
+async fn httponly(c: &mut Checks) {
+    let pages = crawl(&format!("{}/hk", env("ECHO")), 2, 2, Default::default()).await;
+    let seen = pages
+        .iter()
+        .find(|p| p.get_url().ends_with("/hk2"))
+        .map(title)
+        .unwrap_or_default();
+    c.check(
+        "HttpOnly cookie hidden on the next page",
+        seen.contains("vis=1") && !seen.contains("hk="),
+        format!("title={seen:?}"),
+    );
+}
+
 /// A hostname only the browser resolves still loads (no local-DNS veto).
 async fn dns(c: &mut Checks) {
     let page = fetch(&format!("{}/content", env("ECHO_HOST")), 2).await;
@@ -196,6 +225,7 @@ async fn main() {
         Some("refresh") => refresh(&mut c).await,
         Some("dns") => dns(&mut c).await,
         Some("session") => session(&mut c).await,
+        Some("httponly") => httponly(&mut c).await,
         Some("challenge-page") => challenge_page(&mut c).await,
         Some("fetch") => {
             // Used by run.sh around checks it verifies from container logs.
@@ -209,7 +239,7 @@ async fn main() {
         }
         other => {
             eprintln!(
-                "usage: runner <anubis|refresh|dns|session|challenge-page|fetch URL> (got {other:?})"
+                "usage: runner <anubis|refresh|dns|session|httponly|challenge-page|fetch URL> (got {other:?})"
             );
             std::process::exit(2);
         }
