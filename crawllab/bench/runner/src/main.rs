@@ -20,6 +20,11 @@ fn env(name: &str) -> String {
 /// One page through the remote browser, configured the way the crawler runs:
 /// the browser owns the identity and nothing is synthesised on the page.
 async fn fetch(url: &str, wait_secs: u64) -> Option<Page> {
+    fetch_with_cookies(url, wait_secs, "").await
+}
+
+/// `fetch`, starting the browser context with these cookies (`k=v; k2=v2`).
+async fn fetch_with_cookies(url: &str, wait_secs: u64, cookies: &str) -> Option<Page> {
     let mut w = Website::new(url);
     w.with_limit(1)
         .with_depth(0)
@@ -30,6 +35,7 @@ async fn fetch(url: &str, wait_secs: u64) -> Option<Page> {
         .with_wait_for_delay(Some(WaitForDelay::new(Some(Duration::from_secs(
             wait_secs,
         )))))
+        .with_cookies(cookies)
         .with_chrome_connection(Some(env("CDP")));
     let mut w = w.build().ok()?;
     let mut rx = w.subscribe(4);
@@ -121,6 +127,31 @@ async fn refresh(c: &mut Checks) {
     );
 }
 
+/// A second crawl started with the first crawl's cookies continues its session.
+/// run.sh checks that Anubis challenged only the first.
+async fn session(c: &mut Checks) {
+    let url = format!("{}/fast", env("ANUBIS"));
+    let mut cookies = String::new();
+    for crawl in ["first", "second"] {
+        let page = fetch_with_cookies(&url, 15, &cookies).await;
+        let t = page.as_ref().map(title).unwrap_or_default();
+        c.check(
+            format!("session {crawl} crawl"),
+            t.starts_with("Backend"),
+            format!("title={t:?}"),
+        );
+        cookies = page
+            .and_then(|p| p.cookies.clone())
+            .map(|h| {
+                h.iter()
+                    .filter_map(|(k, v)| Some(format!("{k}={}", v.to_str().ok()?)))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            })
+            .unwrap_or_default();
+    }
+}
+
 /// A hostname only the browser resolves still loads (no local-DNS veto).
 async fn dns(c: &mut Checks) {
     let page = fetch(&format!("{}/content", env("ECHO_HOST")), 2).await;
@@ -168,6 +199,7 @@ async fn main() {
         Some("anubis") => anubis(&mut c).await,
         Some("refresh") => refresh(&mut c).await,
         Some("dns") => dns(&mut c).await,
+        Some("session") => session(&mut c).await,
         Some("challenge-page") => challenge_page(&mut c).await,
         Some("fetch") => {
             // Used by run.sh around checks it verifies from container logs.
@@ -181,7 +213,7 @@ async fn main() {
         }
         other => {
             eprintln!(
-                "usage: runner <anubis|refresh|dns|challenge-page|fetch URL> (got {other:?})"
+                "usage: runner <anubis|refresh|dns|session|challenge-page|fetch URL> (got {other:?})"
             );
             std::process::exit(2);
         }
