@@ -7,10 +7,12 @@
 //! ECHO (http://ip:8000), ECHO_HOST (the echo server by a hostname only the
 //! browser can resolve).
 
+use spider::client::cookie::Jar;
 use spider::configuration::{CrawlEnhancement, WaitForDelay};
 use spider::page::Page;
 use spider::utils::disposition::PageDisposition;
 use spider::website::Website;
+use std::sync::Arc;
 use std::time::Duration;
 
 fn env(name: &str) -> String {
@@ -20,11 +22,11 @@ fn env(name: &str) -> String {
 /// One page through the remote browser, configured the way the crawler runs:
 /// the browser owns the identity and nothing is synthesised on the page.
 async fn fetch(url: &str, wait_secs: u64) -> Option<Page> {
-    fetch_with_cookies(url, wait_secs, "").await
+    fetch_with_jar(url, wait_secs, Default::default()).await
 }
 
-/// `fetch`, starting the browser context with these cookies (`k=v; k2=v2`).
-async fn fetch_with_cookies(url: &str, wait_secs: u64, cookies: &str) -> Option<Page> {
+/// `fetch` with the crawl's cookie jar: crawls given one jar share a session.
+async fn fetch_with_jar(url: &str, wait_secs: u64, jar: Arc<Jar>) -> Option<Page> {
     let mut w = Website::new(url);
     w.with_limit(1)
         .with_depth(0)
@@ -35,9 +37,9 @@ async fn fetch_with_cookies(url: &str, wait_secs: u64, cookies: &str) -> Option<
         .with_wait_for_delay(Some(WaitForDelay::new(Some(Duration::from_secs(
             wait_secs,
         )))))
-        .with_cookies(cookies)
         .with_chrome_connection(Some(env("CDP")));
     let mut w = w.build().ok()?;
+    w.cookie_jar = jar;
     let mut rx = w.subscribe(4);
     let got = tokio::spawn(async move { rx.recv().await.ok() });
     w.crawl().await;
@@ -127,28 +129,22 @@ async fn refresh(c: &mut Checks) {
     );
 }
 
-/// A second crawl started with the first crawl's cookies continues its session.
-/// run.sh checks that Anubis challenged only the first.
+/// Two crawls sharing a cookie jar share the session: the browser reads the
+/// jar's cookies before each page and writes its own back after. run.sh checks
+/// that Anubis challenged only the first.
 async fn session(c: &mut Checks) {
     let url = format!("{}/fast", env("ANUBIS"));
-    let mut cookies = String::new();
+    let jar = Arc::new(Jar::default());
     for crawl in ["first", "second"] {
-        let page = fetch_with_cookies(&url, 15, &cookies).await;
-        let t = page.as_ref().map(title).unwrap_or_default();
+        let t = fetch_with_jar(&url, 15, jar.clone())
+            .await
+            .map(|p| title(&p))
+            .unwrap_or_default();
         c.check(
             format!("session {crawl} crawl"),
-            t.starts_with("Backend"),
+            t == "Backend /fast",
             format!("title={t:?}"),
         );
-        cookies = page
-            .and_then(|p| p.cookies.clone())
-            .map(|h| {
-                h.iter()
-                    .filter_map(|(k, v)| Some(format!("{k}={}", v.to_str().ok()?)))
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            })
-            .unwrap_or_default();
     }
 }
 
