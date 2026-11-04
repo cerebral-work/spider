@@ -3850,6 +3850,11 @@ pub struct ChromeFetchParams<'a> {
     /// first-byte watchdog passes this URL to
     /// `LazyChromeFailover::mark_url_bad` on timeout.
     pub chrome_endpoint_url: Option<&'a str>,
+    /// The crawl's cookie jar. A page fetch without its own jar uses this
+    /// one: the jar's cookies for the URL go into the page before it
+    /// navigates, and the browser's cookies come back after.
+    #[cfg(feature = "cookies")]
+    pub cookie_jar: Option<&'a std::sync::Arc<crate::client::cookie::Jar>>,
     /// Per-crawl enhancement overrides, copied from `Configuration`. `Copy` and
     /// allocation-free; resolved per gated site via `enabled(..)`. An untouched
     /// (default) value makes every section follow its env/global default.
@@ -4463,6 +4468,15 @@ pub async fn fetch_page_html_chrome_base<'h>(
 
         (t1.0, t1.1, res_map, req_map)
     });
+
+    // The jar's cookies for this URL, from the HTTP client or an earlier
+    // crawl and for any host, reach the browser before it requests the page.
+    #[cfg(feature = "cookies")]
+    if let (Some(jar), Ok(url)) = (jar, url::Url::parse(target_url)) {
+        if let Ok(cookies) = crate::features::chrome::cookie_params_from_jar(jar, &url) {
+            let _ = crate::features::chrome::set_page_cookies(page, cookies).await;
+        }
+    }
 
     let page_navigation = async {
         run_navigate_or_content_set_core(
@@ -8640,10 +8654,13 @@ pub async fn fetch_page_html<'h>(
     referrer: Option<String>,
     max_page_bytes: Option<f64>,
     cache_options: Option<CacheOptions>,
+    #[cfg(feature = "cookies")] jar: Option<&std::sync::Arc<crate::client::cookie::Jar>>,
     cache_namespace: Option<&str>,
     params: &ChromeFetchParams<'_>,
     extract: Option<&mut crate::page::ChromeStreamingExtractor<'h>>,
 ) -> PageResponse {
+    #[cfg(not(feature = "cookies"))]
+    let jar = None;
     fetch_page_html_base(
         target_url,
         client,
@@ -8653,7 +8670,7 @@ pub async fn fetch_page_html<'h>(
         max_page_bytes,
         cache_options,
         None,
-        None,
+        jar,
         cache_namespace,
         params,
         extract,
