@@ -118,6 +118,15 @@ class Handler(BaseHTTPRequestHandler):
         if self._refresh_routes():
             return
         path = self.path.split("?")[0]
+        if path == "/link":
+            # A page linking to the URL in ?to=, for crawls that leave the host.
+            from html import escape
+            from urllib.parse import parse_qs, urlsplit
+            to = parse_qs(urlsplit(self.path).query).get("to", ["/content"])[0]
+            body = f'<!doctype html><title>Link</title><a href="{escape(to)}">next</a>'.encode()
+            self.send_response(200); self.send_header("Content-Type", "text/html"); self.send_header("Content-Length", str(len(body))); self.end_headers()
+            self.wfile.write(body)
+            return
         if path in ("/hk", "/hk2"):
             # /hk sets an HttpOnly cookie and a script-visible one and links on;
             # /hk2 shows what its scripts can read in the title.
