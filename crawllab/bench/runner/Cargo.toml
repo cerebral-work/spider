@@ -1,0 +1,12 @@
+[package]
+name = "crawllab-bench-runner"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Standalone: not a member of the spider workspace, so upstream merges stay clean.
+[workspace]
+
+[dependencies]
+spider = { path = "../../../spider", features = ["chrome", "sync"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
