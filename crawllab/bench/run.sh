@@ -65,6 +65,18 @@ for check in challenge-page refresh dns anubis; do
   "${runner[@]}" "$check" || status=1
 done
 
+# A second crawl started with the first crawl's cookies: Anubis challenges only the first.
+issued() { docker logs cb-anubis 2>&1 | grep -c "new challenge issued" || true; }
+before=$(issued)
+"${runner[@]}" session || status=1
+after=$(issued)
+if [ "$((after - before))" = 1 ]; then
+  echo "PASS one challenge across two crawls sharing cookies"
+else
+  echo "FAIL $((after - before)) challenges across two crawls sharing cookies"
+  status=1
+fi
+
 # The runner turns PointerAssist off: no synthetic mouse events may reach the browser.
 before=$(docker logs cb-obscura 2>&1 | grep -c "Input.dispatchMouseEvent" || true)
 "${runner[@]}" fetch "$ECHO/content" || status=1
