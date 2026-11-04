@@ -30,11 +30,12 @@ async fn fetch_with_jar(url: &str, wait_secs: u64, jar: Arc<Jar>) -> Option<Page
     crawl(url, wait_secs, 1, jar).await.into_iter().next()
 }
 
-/// Up to `limit` pages from `url`, configured as in `fetch`.
+/// Up to `limit` pages from `url`, on any host, configured as in `fetch`.
 async fn crawl(url: &str, wait_secs: u64, limit: u32, jar: Arc<Jar>) -> Vec<Page> {
     let mut w = Website::new(url);
     w.with_limit(limit)
         .with_depth(0)
+        .with_external_domains(Some(std::iter::once("*".to_string())))
         .with_user_agent(None)
         .with_stealth(false)
         .with_fingerprint(false)
@@ -177,6 +178,18 @@ async fn httponly(c: &mut Checks) {
     );
 }
 
+/// A link from the first page to another host is followed.
+async fn external(c: &mut Checks) {
+    let start = format!("{}/link?to={}/content", env("ECHO"), env("ECHO_HOST"));
+    let pages = crawl(&start, 2, 2, Default::default()).await;
+    let titles: Vec<String> = pages.iter().map(title).collect();
+    c.check(
+        "link to another host followed",
+        titles.iter().any(|t| t == "Real content"),
+        format!("titles={titles:?}"),
+    );
+}
+
 /// A hostname only the browser resolves still loads (no local-DNS veto).
 async fn dns(c: &mut Checks) {
     let page = fetch(&format!("{}/content", env("ECHO_HOST")), 2).await;
@@ -226,6 +239,7 @@ async fn main() {
         Some("dns") => dns(&mut c).await,
         Some("session") => session(&mut c).await,
         Some("httponly") => httponly(&mut c).await,
+        Some("external") => external(&mut c).await,
         Some("challenge-page") => challenge_page(&mut c).await,
         Some("fetch") => {
             // Used by run.sh around checks it verifies from container logs.
@@ -239,7 +253,7 @@ async fn main() {
         }
         other => {
             eprintln!(
-                "usage: runner <anubis|refresh|dns|session|httponly|challenge-page|fetch URL> (got {other:?})"
+                "usage: runner <anubis|refresh|dns|session|httponly|external|challenge-page|fetch URL> (got {other:?})"
             );
             std::process::exit(2);
         }
