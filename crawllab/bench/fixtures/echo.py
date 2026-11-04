@@ -118,6 +118,20 @@ class Handler(BaseHTTPRequestHandler):
         if self._refresh_routes():
             return
         path = self.path.split("?")[0]
+        if path in ("/hk", "/hk2"):
+            # /hk sets an HttpOnly cookie and a script-visible one and links on;
+            # /hk2 shows what its scripts can read in the title.
+            if path == "/hk":
+                body = b'<!doctype html><title>Cookies set</title><a href="/hk2">next</a>'
+            else:
+                body = b'<!doctype html><title>none</title><script>document.title = "seen:" + document.cookie;</script>'
+            self.send_response(200)
+            if path == "/hk":
+                self.send_header("Set-Cookie", "hk=1; HttpOnly; Path=/")
+                self.send_header("Set-Cookie", "vis=1; Path=/")
+            self.send_header("Content-Type", "text/html"); self.send_header("Content-Length", str(len(body))); self.end_headers()
+            self.wfile.write(body)
+            return
         # Any other path is "the protected app": a page that names the path.
         default = (f"<!doctype html><title>Backend {path}</title><p>backend reached: {path}</p>".encode(), "text/html")
         body, ctype = FILES.get(path, default)

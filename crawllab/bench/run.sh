@@ -61,7 +61,7 @@ export CHALLENGE_HTML="$work/challenge.html"
 
 runner=(cargo run -q --manifest-path "$here/runner/Cargo.toml" --)
 status=0
-for check in challenge-page refresh dns anubis; do
+for check in challenge-page refresh dns anubis httponly; do
   "${runner[@]}" "$check" || status=1
 done
 
