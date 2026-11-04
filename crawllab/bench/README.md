@@ -19,7 +19,7 @@ Set `OBSCURA_PROFILE=/path/device.json` to run it with a device profile.
 | `anubis` | Every Anubis challenge method (metarefresh, preact, fast, slow, sha256, argon2id, hashx) at base and hard settings ends on the backend page, classified `Content` |
 | `refresh` | A page that refreshes to another page or to a 404 reports that document's URL and status |
 | `dns` | A hostname only the browser can resolve still loads (no local-DNS veto) |
-| `session` | A second crawl started with the first crawl's cookies: Anubis challenges only the first |
+| `session` | Two crawls sharing a cookie jar: Anubis challenges only the first |
 | `challenge-page` | A captured Anubis challenge page classifies as `Challenge`, and its honeypot link is not extracted |
 | pointer | No `Input.dispatchMouseEvent` reaches the browser with `PointerAssist` off |
 | identity | Every request at the backend carries one user agent and platform |
@@ -27,10 +27,10 @@ Set `OBSCURA_PROFILE=/path/device.json` to run it with a device profile.
 The runner's crawler configuration is the reference for remote-browser use: the
 browser owns the identity (`with_user_agent(None)`, stealth and fingerprint
 off), `PointerAssist` is off, and a page wait lets self-navigating pages settle.
-To continue a site's session in a later crawl, start it with the previous crawl's
-cookies (`with_cookies`, built from `page.cookies`). That carries names and
-values only: the cookies go to the start host at path `/`, without expiry or
-`Secure`.
+Browser pages and the HTTP client share `Website::cookie_jar`, so crawls given
+one jar, or one `Website` crawled again, continue the session on each host they
+crawl. Cookies going from the jar into the browser carry name and value only,
+and the jar lives in memory.
 
 ## Fixtures
 
