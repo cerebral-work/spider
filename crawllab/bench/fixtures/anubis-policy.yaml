@@ -1,0 +1,63 @@
+# Local test policy: each path prefix forces one challenge method.
+bots:
+  - name: robots-txt
+    path_regex: ^/robots\.txt$
+    action: ALLOW
+  - name: metarefresh
+    path_regex: ^/metarefresh
+    action: CHALLENGE
+    challenge: { algorithm: metarefresh, difficulty: 1 }
+  - name: preact
+    path_regex: ^/preact
+    action: CHALLENGE
+    challenge: { algorithm: preact, difficulty: 1 }
+  - name: fast
+    path_regex: ^/fast
+    action: CHALLENGE
+    challenge: { algorithm: fast, difficulty: 4 }
+  - name: slow
+    path_regex: ^/slow
+    action: CHALLENGE
+    challenge: { algorithm: slow, difficulty: 4 }
+  - name: sha256
+    path_regex: ^/sha256
+    action: CHALLENGE
+    challenge: { algorithm: sha256, difficulty: 4 }
+  - name: argon2id
+    path_regex: ^/argon2id
+    action: CHALLENGE
+    challenge: { algorithm: argon2id, difficulty: 2 }
+  - name: hashx
+    path_regex: ^/hashx
+    action: CHALLENGE
+    challenge: { algorithm: hashx, difficulty: 4 }
+  - name: fast-d5
+    path_regex: ^/hard/fast5
+    action: CHALLENGE
+    challenge: { algorithm: fast, difficulty: 5 }
+  - name: sha256-d6
+    path_regex: ^/hard/sha256-6
+    action: CHALLENGE
+    challenge: { algorithm: sha256, difficulty: 6 }
+  - name: hashx-d6
+    path_regex: ^/hard/hashx6
+    action: CHALLENGE
+    challenge: { algorithm: hashx, difficulty: 6 }
+  - name: argon2id-d4
+    path_regex: ^/hard/argon2id4
+    action: CHALLENGE
+    challenge: { algorithm: argon2id, difficulty: 4 }
+  - name: everything-else
+    path_regex: .*
+    action: ALLOW
+
+dnsbl: false
+honeypot:
+  enabled: true
+  implementation: naive
+status_codes:
+  CHALLENGE: 200
+  DENY: 200
+store:
+  backend: memory
+  parameters: {}
